@@ -12,17 +12,17 @@ screenY = 12 --What should be the vertical resolution of the downscaled screen t
 ROMlocation = "" --Which ROM should it load and play?
 primaryMovieLocation = "" --What movie should it play first?(This movie is typically used to get past the title screen, or to start the AI in a specific part or the game.)
 secondaryMovieLocation = "" --What filename should the final movie have?(This will be the movie this code will generate at the end. Basically, it will be the original movie with the AI inputs added at the end.)
-randomness = 5 --How much should the values of the AI deviate each generation?
+randomness = 0.2 --How much should the values of the AI deviate each generation?
 mortality = 5 --What ratio of attempts should persist to the next generation?(1: all of 'em 2: half 3: one third, and so on.)
 timestep = 6000 --for how many frames should the attempt last?
 totaltimesteps = 100 --How many times should it continue the game from the best game it played so far?
 triesPerEpisode = 50 --How many attempts should it try per generation?
 plateu = 50 --How many generations should it try before deciding that it has played the best possible game and continuing from it?
-NeuralNetStructure = {70} --What should the hidden layer of the AI's neural network look like?
-HowManyInputs = 4. --How many buttons should the AI be able to press? Exactly which buttons it is allowed to press can be changed on line 199.
+NeuralNetStructure = {} --What should the hidden layer of the AI's neural network look like?
+HowManyInputs = 4 --How many buttons should the AI be able to press? Exactly which buttons it is allowed to press can be changed on line 201.
 main = savestate.object(5) --These two are savestates it's going to use. The numbers don't matter, but make sure it doesn't overwrite any savestate you personally need!
 buffer = savestate.object(6)
-emu.speedmode("turbo") --At what speed should the emulator run?("normal", "turbo", "maximum")
+speed = "turbo" --At what speed should the emulator run?("normal", "turbo", "maximum")
 
 
 
@@ -148,6 +148,7 @@ table.insert(NetDimensions, {HowManyInputs})
 ----------Load ROM, play movie until finished, save state----------
 dummyarray = {}
 emu.loadrom(ROMlocation)
+emu.speedmode("maximum")
 movie.play(primaryMovieLocation, true)
 while movie.mode() ~= "finished" do
   emu.frameadvance()
@@ -161,6 +162,7 @@ for x = 1, #dummyarray do
   emu.frameadvance()
 end
 savestate.save(main)
+emu.speedmode(speed)
 
 
 
