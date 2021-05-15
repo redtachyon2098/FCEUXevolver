@@ -18,7 +18,8 @@ timestep = 6000 --for how many frames should the attempt last?
 totaltimesteps = 100 --How many times should it continue the game from the best game it played so far?
 triesPerEpisode = 50 --How many attempts should it try per generation?
 plateu = 50 --How many generations should it try before deciding that it has played the best possible game and continuing from it?
-NetDimensions = {screenX * screenY, 70, 4} --How many layers and nodes per layer should the neural network have?(Don't change the first entry in the table. Also, the very last entry should be the number of buttons it should be allowed to press. Exactly which buttons it can press can be changed later in the code(See line 195). By default it can press A, B, left, right.)
+NeuralNetStructure = {70} --What should the hidden layer of the AI's neural network look like?
+HowManyInputs = 4. --How many buttons should the AI be able to press? Exactly which buttons it is allowed to press can be changed on line 199.
 main = savestate.object(5) --These two are savestates it's going to use. The numbers don't matter, but make sure it doesn't overwrite any savestate you personally need!
 buffer = savestate.object(6)
 emu.speedmode("turbo") --At what speed should the emulator run?("normal", "turbo", "maximum")
@@ -122,7 +123,7 @@ function getscreen(screenX, screenY)
   local pallete = 0
   for x = 0, screenX - 1 do
     for y = 0, screenY - 1 do
-      gui.pixel(x * math.floor(255 / screenX), y * math.floor(239 / screenY), "cyan") --By the way, the code puts markers on the screen as a debugging feature, but you can remove it by commenting out this line.
+      gui.pixel(x * math.floor(255 / screenX), y * math.floor(239 / screenY), "cyan") --The code puts markers on the screen as a debugging feature, but you can remove it by commenting out this line.
       value = 0
       for z = 0, math.floor(255 / screenX) - 1 do
         for w = 0, math.floor(239 / screenY) - 1 do
@@ -138,6 +139,9 @@ end
 weights = {}
 biases = {}
 nodes = {{}}
+NetDimensions = {screenX * screenY}
+table.insert(NetDimensions, NeuralNetStructure)
+table.insert(NetDimensions, {HowManyInputs})
 
 
 
@@ -173,7 +177,7 @@ bestfitness = 0
 backupfit = 0
 stuck = 0
 howmanytimesteps = 1
-while true do
+while howmanytimesteps <= totaltimesteps do
   generation = generation + 1
   fitness = {}
   for x = 1, triesPerEpisode do
@@ -192,7 +196,7 @@ while true do
           table.insert(actualinput, true)
         end
       end
-      joypad.set(1,{left=actualinput[1],right=actualinput[2],A=actualinput[3],B=actualinput[4],}) --This is the line that dictateds which buttons can be pressed. Change if you must. "actualinput" is the table this code uses to represent the inputs the AI would be pressing.
+      joypad.set(1,{left=actualinput[1],right=actualinput[2],A=actualinput[3],B=actualinput[4]}) --This is the line that dictateds which buttons can be pressed. Change if you must. "actualinput" is the table this code uses to represent the inputs the AI would be pressing.
       emu.frameadvance()
       gui.text(5, 10, "Timestep: "..howmanytimesteps.." Generation: "..generation.." Player: "..x.." out of "..triesPerEpisode.."\nFitness: "..utility().." Best fitness ever: "..bestfitness.."\n"..timestep - count.." frames until reset") --This makes a HUD with some information, but if you don't need it, you can comment it out with no problems.
     end
@@ -234,9 +238,6 @@ while true do
   wlist = nextw
   blist = nextb
   print("Generation:"..generation.." Best fitness:"..bestfitness)
-  if howmanytimesteps == totaltimesteps then
-    break
-  end
   if stuck > plateu then
     savestate.load(buffer)
     savestate.save(main)
