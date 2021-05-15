@@ -19,7 +19,7 @@ totaltimesteps = 100 --How many times should it continue the game from the best 
 triesPerEpisode = 50 --How many attempts should it try per generation?
 plateu = 50 --How many generations should it try before deciding that it has played the best possible game and continuing from it?
 NeuralNetStructure = {} --What should the hidden layer of the AI's neural network look like?
-HowManyInputs = 4 --How many buttons should the AI be able to press? Exactly which buttons it is allowed to press can be changed on line 201.
+HowManyInputs = 4 --How many buttons should the AI be able to press? Exactly which buttons it is allowed to press can be changed on line 203.
 main = savestate.object(5) --These two are savestates it's going to use. The numbers don't matter, but make sure it doesn't overwrite any savestate you personally need!
 buffer = savestate.object(6)
 speed = "turbo" --At what speed should the emulator run?("normal", "turbo", "maximum")
@@ -140,8 +140,10 @@ weights = {}
 biases = {}
 nodes = {{}}
 NetDimensions = {screenX * screenY}
-table.insert(NetDimensions, NeuralNetStructure)
-table.insert(NetDimensions, {HowManyInputs})
+for x = 1, #NeuralNetStructure do
+  table.insert(NetDimensions, NeuralNetStructure[x])
+end
+table.insert(NetDimensions, HowManyInputs)
 
 
 
