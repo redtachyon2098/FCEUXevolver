@@ -1,74 +1,51 @@
---Welcome to FCEUXevolver! This is a simple neuro-evolution AI script that runs on the NES emulator FCEUX. 
+--Welcome to FCEUXevolver! This is a simple neuro-evolution AI script that runs on the NES emulator FCEUX.
 --To use this program as intended, simply change the configurations and functions to suit the game you are playing(There will be more information on that later).
 --After that, fire up FCEUX with nothing loaded, and run this code from the FCEUX lua script window which can be found in File > Lua > New Lua Script Window.
 
---What it does: It loads a ROM, plays a movie until it ends, and saves a state. Then it evolves to maximize the utility function without dying. If the highest score ever reached plateus, it saves a state at the end of the best attempt it ever did, and trains starting from that point all over again, and records a new movie of the whold thing.
+--What it does: It loads a ROM, plays a movie until it ends, and saves a state. Then it evolves to maximize the average utility function without dying.
+--After the AI has evolved enough to be decent, you can press the "select" button on your controller to generate a movie with the best AI inputs added in.
 
+--With this version of the code, you can modify the time limit the AI is given on the fly, potentially making the process much faster.
 
-
+--The configurations of this code is an example, I found it to be good when playing Super Mario Bros.
 ---------------------------------------Some configurations you have to know(The ones set below are just examples, feel free to change it.)-----------------------------
-screenX = 12 --What should be the horizontal resolution of the downscaled screen the AIs are going to see?
-screenY = 12 --What should be the vertical resolution of the downscaled screen the AIs are going to see?
-ROMlocation = "" --Which ROM should it load and play?
-primaryMovieLocation = "" --What movie should it play first?(This movie is typically used to get past the title screen, or to start the AI in a specific part or the game.)
-secondaryMovieLocation = "" --What filename should the final movie have?(This will be the movie this code will generate at the end. Basically, it will be the original movie with the AI inputs added at the end.)
-randomness = 0.2 --How much should the values of the AI deviate each generation?
+screenX = 15 --What should be the horizontal resolution of the downscaled screen the AIs are going to see?
+screenY = 15 --What should be the vertical resolution of the downscaled screen the AIs are going to see?
+ROMlocation = "SuperMarioBros.nes" --Which ROM should it load and play?
+primaryMovieLocation = "primary.fm2" --What movie should it play first?(This movie is typically used to get past the title screen, or to start the AI in a specific part or the game.)
+secondaryMovieLocation = "secondary.fm2" --What filename should the final movie have?(This will be the movie this code will generate at the end. Basically, it will be the original movie with the AI inputs added at the end.)
+randomness = 0.05 --How much should the values of the AI deviate each generation? (This evolutionary algorithm does asexual reproduction, I'll implement crossover later.)
 mortality = 5 --What ratio of attempts should persist to the next generation?(1: all of 'em 2: half 3: one third, and so on.)
-timestep = 6000 --for how many frames should the attempt last?
-totaltimesteps = 100 --How many times should it continue the game from the best game it played so far?
-triesPerEpisode = 50 --How many attempts should it try per generation?
-plateu = 50 --How many generations should it try before deciding that it has played the best possible game and continuing from it?
-NeuralNetStructure = {} --What should the hidden layer of the AI's neural network look like?
-HowManyInputs = 4 --How many buttons should the AI be able to press? Exactly which buttons it is allowed to press can be changed on line 203.
-main = savestate.object(5) --These two are savestates it's going to use. The numbers don't matter, but make sure it doesn't overwrite any savestate you personally need!
-buffer = savestate.object(6)
-speed = "turbo" --At what speed should the emulator run?("normal", "turbo", "maximum")
+timestep = 60 --for how many frames should the attempt initially last?
+triesPerEpisode = 20 --How many attempts should it try per generation?
+NetDimensions = {screenX * screenY, 40, 4} --How many layers and nodes per layer should the neural network have?(Don't change the first entry in the table. Also, the very last entry should be the number of buttons it should be allowed to press. Exactly which buttons it can press can be changed later in the code(See line 195). By default it can press A, B, left, right.)
+main = savestate.object(5) --This is a savestate it's going to use. The number doesn't matter, but make sure it doesn't overwrite any savestates you personally need!
+speed = "maximum" --At what speed should the emulator run?("normal", "turbo", "maximum")
 
-
-
---------------------------------------------------------------funtions you have to define properly depending on the game-------------------------------------------------
+--------------------------------------------------------------funtions you have to define properly depending on the game.-------------------------------------------------
 function utility() --This is the literal utility function, meant to give a score on how well the AI did. It could be a score, where it is on the screen, etc. The goal of the AI is to maximize it.
-  return 0 --Obvously change this depending on the kind of game you are trying to AI.
+  return memory.readbyte(109) * 256 + memory.readbyte(134) --Obviously change this depending on the kind of game you are trying to AI.
 end
 function dead() --This is a function that is supposed to detect whether the player has died and should restart.
-  return false --Again, change this depending on the game you're AIing. It should output "true" when the player is dead, and "false" when it isn't.
-end --Note: By default, the code tries its best not to die and doesn't take any apptempts in which it died into consideration when choosing the best attempt. If you don't want this, you would have to tweak the code(Just make the function output "false" all the time).
---
+  return memory.readbyte(1969) == 1 --Again, change this depending on the game you're AIing. It should output "true" when the player is dead, and "false" when it isn't.
+end --Note: By default, the code tries its best not to die and immediately stops any attempts that die. If you don't want this, you would have to tweak the code(Just make the function output "false" all the time).
+function timelimit(currentlimit, bestutility) --This is the function that updates the time limit based on the current time limit and the best score it got. Obviously change this depending on the game.
+  if currentlimit > 3 * bestutility / 4 then
+    return currentlimit
+  else
+    return math.floor(3 * bestutility / 4)
+  end
+end
 
 
 --------------------------------This code will take care of the rest unless you want to mess with it. Please try to improve this if you are good at coding :(--------------------------------
-function average(list)
-  local a = 0
-  for x = 1,#list do
-    a = a + list[x]
-  end
-  return a / #list
-end
 function sigmoid(x)
   return 1 / (1 + (2.71828 ^ (-x)))
-end
-function leakrelu(x)
-  if x < 0 then
-    return x / 20
-  else
-    return x
-  end
 end
 function biggest(list)
   local big = {1}
   for x = 2, #list do
     if list[x] > list[big[1]] then
-      big = {x}
-    elseif list[x] == list[big[1]] and big[1] ~= x then
-      table.insert(big,x)
-    end
-  end
-  return big[math.random(1,#big)]
-end
-function smallest(list)
-  local big = {1}
-  for x = 2, #list do
-    if list[x] < list[big[1]] then
       big = {x}
     elseif list[x] == list[big[1]] and big[1] ~= x then
       table.insert(big,x)
@@ -123,7 +100,7 @@ function getscreen(screenX, screenY)
   local pallete = 0
   for x = 0, screenX - 1 do
     for y = 0, screenY - 1 do
-      gui.pixel(x * math.floor(255 / screenX), y * math.floor(239 / screenY), "cyan") --The code puts markers on the screen as a debugging feature, but you can remove it by commenting out this line.
+      gui.pixel(x * math.floor(255 / screenX), y * math.floor(239 / screenY), "cyan") --By the way, the code puts markers on the screen as a debugging feature, but you can remove it by commenting out this line.
       value = 0
       for z = 0, math.floor(255 / screenX) - 1 do
         for w = 0, math.floor(239 / screenY) - 1 do
@@ -139,23 +116,17 @@ end
 weights = {}
 biases = {}
 nodes = {{}}
-NetDimensions = {screenX * screenY}
-for x = 1, #NeuralNetStructure do
-  table.insert(NetDimensions, NeuralNetStructure[x])
-end
-table.insert(NetDimensions, HowManyInputs)
 
 
 
 ----------Load ROM, play movie until finished, save state----------
 dummyarray = {}
 emu.loadrom(ROMlocation)
-emu.speedmode("maximum")
 movie.play(primaryMovieLocation, true)
 while movie.mode() ~= "finished" do
   emu.frameadvance()
   table.insert(dummyarray, joypad.get(1))
-  end
+end
 movie.stop()
 movie.record(secondaryMovieLocation)
 movie.rerecordcounting(true)
@@ -178,17 +149,21 @@ for x = 1, triesPerEpisode do
 end
 generation = 0
 bestfitness = 0
-backupfit = 0
-stuck = 0
-howmanytimesteps = 1
-while howmanytimesteps <= totaltimesteps do
+unproductive = 0
+running = true
+killswitch = false
+while true do
   generation = generation + 1
   fitness = {}
+  bestutility = 0
   for x = 1, triesPerEpisode do
     weights = wlist[x]
     biases = blist[x]
     count = 1
-    while count < timestep and not dead() do
+    totalscore = 0
+    unproductive = 0
+    prevut = 0
+    while count < timestep and not dead() and unproductive < 180 do
       count = count + 1
       predict(getscreen(screenX, screenY))
       prediction = nodes[#nodes]
@@ -200,18 +175,39 @@ while howmanytimesteps <= totaltimesteps do
           table.insert(actualinput, true)
         end
       end
-      joypad.set(1,{left=actualinput[1],right=actualinput[2],A=actualinput[3],B=actualinput[4]}) --This is the line that dictateds which buttons can be pressed. Change if you must. "actualinput" is the table this code uses to represent the inputs the AI would be pressing.
-      emu.frameadvance()
-      gui.text(5, 10, "Timestep: "..howmanytimesteps.." Generation: "..generation.." Player: "..x.." out of "..triesPerEpisode.."\nFitness: "..utility().." Best fitness ever: "..bestfitness.."\n"..timestep - count.." frames until reset") --This makes a HUD with some information, but if you don't need it, you can comment it out with no problems.
-    end
-    table.insert(fitness, utility())
-    if utility() > bestfitness then
-      if not dead() then
-        savestate.save(buffer)
+      myinput = joypad.read(1)
+      if myinput.select == true and running then     --The Terminate button.
+        running = false
+        print("Will terminate in next generation.")
       end
-      bestfitness = utility()
+      joypad.set(1,{left=actualinput[1],right=actualinput[2],A=actualinput[3],B=actualinput[4], select=nil}) --This is the line that dictates which buttons can be pressed. Change if you must. "actualinput" is the table this code uses to represent the inputs the AI would be pressing.
+      emu.frameadvance()
+      gui.text(5, 10, " Generation: "..generation.." Player: "..x.." out of "..triesPerEpisode.."\nFitness: "..math.floor(totalscore / count).." Best fitness ever: "..math.floor(bestfitness).."\n"..timestep - count.." frames until reset") --This makes a HUD with some information, but if you don't need it, you can comment it out with no problems.
+      totalscore = totalscore + utility()
+      if utility() == prevut then
+        unproductive = unproductive + 1
+      else
+        unproductive = 0
+      end
+      prevut = utility()
+    end
+    if not running and x == 1 then
+      movie.stop()
+      killswitch = true
+      break
+    end
+    if bestutility < utility() then
+      bestutility = utility()
+    end
+    totalscore = totalscore / count
+    table.insert(fitness, totalscore)
+    if totalscore > bestfitness then
+      bestfitness = totalscore
     end
     savestate.load(main)
+  end
+  if killswitch then
+    break
   end
   champ = biggest(fitness)
   nextw = {}
@@ -242,18 +238,8 @@ while howmanytimesteps <= totaltimesteps do
   wlist = nextw
   blist = nextb
   print("Generation:"..generation.." Best fitness:"..bestfitness)
-  if stuck > plateu then
-    savestate.load(buffer)
-    savestate.save(main)
-    howmanytimesteps = howmanytimesteps + 1
-    print("Moved to next timestep!")
-    stuck = 0
+  if timestep < bestutility then
+    timestep = timelimit(timestep, bestutility)
   end
-  if backupfit < bestfitness then
-    stuck = 0
-  else
-    stuck = stuck + 1
-  end
-  backupfit = bestfitness
 end
-movie.stop()
+emu.speedmode("normal")
