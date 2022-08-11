@@ -122,6 +122,7 @@ nodes = {{}}
 ----------Load ROM, play movie until finished, save state----------
 dummyarray = {}
 emu.loadrom(ROMlocation)
+emu.speedmode(speed)
 movie.play(primaryMovieLocation, true)
 while movie.mode() ~= "finished" do
   emu.frameadvance()
@@ -135,7 +136,6 @@ for x = 1, #dummyarray do
   emu.frameadvance()
 end
 savestate.save(main)
-emu.speedmode(speed)
 
 
 
